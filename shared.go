@@ -1,7 +1,7 @@
 package time
 
 import (
-	. "github.com/tinywasm/fmt"
+	. "webtyp.com/fmt"
 )
 
 // parseTime is a shared helper function for parsing time strings ("HH:MM" or "HH:MM:SS").

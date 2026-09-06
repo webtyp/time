@@ -3,7 +3,7 @@ package time_test
 import (
 	"testing"
 
-	"github.com/tinywasm/time"
+	"webtyp.com/time"
 )
 
 // RunAPITests runs all direct API tests.

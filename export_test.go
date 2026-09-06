@@ -3,7 +3,7 @@
 package time_test
 
 import (
-	"github.com/tinywasm/time"
+	"webtyp.com/time"
 )
 
 // FireTimer triggers the timer callback manually for testing purposes.

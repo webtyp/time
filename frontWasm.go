@@ -5,7 +5,7 @@ package time
 import (
 	"syscall/js"
 
-	. "github.com/tinywasm/fmt"
+	. "webtyp.com/fmt"
 )
 
 func init() {

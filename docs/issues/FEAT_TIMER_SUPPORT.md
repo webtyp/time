@@ -203,7 +203,7 @@ package tinytime_test
 import (
 	"testing"
 
-	"github.com/tinywasm/time"
+	"webtyp.com/time"
 )
 
 // AfterFuncStopShared tests that Stop() prevents callback execution.
@@ -237,7 +237,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tinywasm/time"
+	"webtyp.com/time"
 )
 
 func TestAfterFunc(t *testing.T) {
@@ -284,7 +284,7 @@ package tinytime_test
 import (
 	"testing"
 
-	"github.com/tinywasm/time"
+	"webtyp.com/time"
 )
 
 // WASM tests run in real browser via wasmbrowsertest.
@@ -361,7 +361,7 @@ package crudp
 
 import (
     "sync"
-    "github.com/tinywasm/time"
+    "webtyp.com/time"
 )
 
 type queuedPacket struct {

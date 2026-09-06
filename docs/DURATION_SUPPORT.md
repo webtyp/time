@@ -2,11 +2,11 @@
 
 ## Context
 
-The `tinywasm/time` package provides isomorphic time utilities but is missing the `Duration`
-type and related constants/helpers that backend libraries (e.g., `tinywasm/agent`) need as
+The `webtyp/time` package provides isomorphic time utilities but is missing the `Duration`
+type and related constants/helpers that backend libraries (e.g., `webtyp/agent`) need as
 a replacement for stdlib `time`. Currently these use cases require falling back to `import "time"`:
 
-| Stdlib usage | Missing from tinywasm/time |
+| Stdlib usage | Missing from webtyp/time |
 |-------------|---------------------------|
 | `time.Duration` type | No `Duration` type |
 | `time.Second`, `time.Minute`, `time.Millisecond` | No time-unit constants |
@@ -174,21 +174,21 @@ func TestDuration_IsStdlibAlias(t *testing.T) {
 ## Verification
 
 ```bash
-cd /home/cesar/Dev/Pkg/tinywasm/time && gotest .
+cd /home/cesar/Dev/Pkg/webtyp/time && gotest .
 ```
 
 All existing tests must still pass. Then publish:
 
 ```bash
-cd /home/cesar/Dev/Pkg/tinywasm/time && gopush
+cd /home/cesar/Dev/Pkg/webtyp/time && gopush
 ```
 
 ---
 
-## Usage After This Plan (tinywasm/agent example)
+## Usage After This Plan (webtyp/agent example)
 
 ```go
-import twtime "github.com/tinywasm/time"
+import twtime "webtyp.com/time"
 
 // Duration for http.Client — works because Duration = time.Duration on backend (type alias)
 client := &http.Client{Timeout: 30 * twtime.Second}

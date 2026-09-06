@@ -1,6 +1,6 @@
 # Calendar Functions
 
-This document describes the calendar-related functions added to `tinywasm/time`.
+This document describes the calendar-related functions added to `webtyp/time`.
 
 ## Functions
 

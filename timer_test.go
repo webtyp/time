@@ -3,7 +3,7 @@ package time_test
 import (
 	"testing"
 
-	"github.com/tinywasm/time"
+	"webtyp.com/time"
 )
 
 // AfterFuncStopShared tests that Stop() prevents callback execution.

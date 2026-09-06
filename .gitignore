@@ -1,1 +1,3 @@
-.env
+.envcoverage.out
+coverage.html
+coverage.out

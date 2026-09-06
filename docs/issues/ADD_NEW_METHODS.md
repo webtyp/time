@@ -26,7 +26,7 @@ type TimeProvider interface {
 - Both implementations share test suite in `data_test.go`
 
 **Dependencies:**
-- `github.com/tinywasm/fmt` - For type conversions and formatting
+- `webtyp.com/fmt` - For type conversions and formatting
 
 ---
 

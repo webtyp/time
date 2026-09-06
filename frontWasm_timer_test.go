@@ -5,7 +5,7 @@ package time_test
 import (
 	"testing"
 
-	"github.com/tinywasm/time"
+	"webtyp.com/time"
 )
 
 // WASM tests run in real browser via wasmbrowsertest.

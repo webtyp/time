@@ -6,7 +6,7 @@ A minimal, portable time utility for Go and TinyGo with WebAssembly support. Aut
 ## Quick Start
 
 ```go
-import "github.com/tinywasm/time"
+import "webtyp.com/time"
 
 func main() {
     // Get current Unix timestamp in nanoseconds (UTC)
@@ -160,10 +160,10 @@ gotest
 ```
 
 ## Dependencies
-- `github.com/tinywasm/fmt`
+- `webtyp.com/fmt`
 
 ---
-## [Contributing](https://github.com/tinywasm/cdvelop/blob/main/CONTRIBUTING.md)
+## [Contributing](https://github.com/webtyp/cdvelop/blob/main/CONTRIBUTING.md)
 
 ## License
 

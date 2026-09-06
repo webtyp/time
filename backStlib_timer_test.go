@@ -7,7 +7,7 @@ import (
 	"testing"
 	stlib "time"
 
-	"github.com/tinywasm/time"
+	"webtyp.com/time"
 )
 
 func TestAfterFunc(t *testing.T) {

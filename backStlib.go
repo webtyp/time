@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/tinywasm/fmt"
+	. "webtyp.com/fmt"
 )
 
 func init() {
