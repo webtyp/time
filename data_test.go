@@ -565,43 +565,33 @@ func MidnightUTCShared(t *testing.T) {
 
 // Test LocalMinutesToUnixUTC
 func LocalMinutesToUnixUTCShared(t *testing.T) {
-	// UTC offset 0: 09:00 local == 09:00 UTC
-	// date: 2021-01-01 00:00:00 UTC (1609459200)
-	result := time.LocalMinutesToUnixUTC(1609459200, 9*60, "UTC")
-	expected := int64(1609459200 + 9*3600)
-	if result != expected {
-		t.Errorf("LocalMinutesToUnixUTC(UTC, 09:00) = %d; want %d", result, expected)
+	// The tz argument is authoritative on EVERY backend. The browser's own
+	// offset (SetTimeZoneOffset / getTimezoneOffset) must never leak into a
+	// conversion that names its zone — a clinic in Santiago is read in Santiago
+	// time whatever the viewer's browser says. Pin a non-zero global offset so a
+	// backend that ignores tz fails here instead of passing by coincidence.
+	initialOffset := time.GetTimeZoneOffset()
+	time.SetTimeZoneOffset(7)
+	defer time.SetTimeZoneOffset(initialOffset)
+
+	cases := []struct {
+		name     string
+		dateSec  int64 // midnight UTC of the target date
+		minutes  int
+		tz       string
+		expected int64
+	}{
+		{"UTC", 1609459200, 9 * 60, "UTC", 1609459200 + 9*3600},                                   // 2021-01-01
+		{"New York winter (UTC-5)", 1609459200, 9 * 60, "America/New_York", 1609459200 + 14*3600}, // 2021-01-01
+		{"New York summer (UTC-4)", 1625097600, 9 * 60, "America/New_York", 1625097600 + 13*3600}, // 2021-07-01
+		{"Santiago summer (UTC-3)", 1799971200, 9 * 60, "America/Santiago", 1799971200 + 12*3600}, // 2027-01-15
+		{"Santiago winter (UTC-4)", 1812672000, 9 * 60, "America/Santiago", 1812672000 + 13*3600}, // 2027-06-11
+		{"invalid zone falls back to UTC", 1609459200, 9 * 60, "Invalid/Zone", 1609459200 + 9*3600},
 	}
-
-	// UTC-5 (America/New_York winter): 09:00 local == 14:00 UTC
-	result = time.LocalMinutesToUnixUTC(1609459200, 9*60, "America/New_York")
-	expected = int64(1609459200 + 14*3600)
-
-	// In WASM, we only support the global offset.
-	// In the backend, we support full IANA resolution.
-	// Determine if we are in WASM by checking the provider if possible, or just log.
-	if result != expected {
-		// If we are in backend, this is a failure.
-		// If we are in WASM, it's expected unless we set the offset.
-		t.Logf("LocalMinutesToUnixUTC(America/New_York, 09:00) = %d; want %d (divergence expected in WASM if offset is not -300)", result, expected)
-
-		// If we set the offset to -300, it should match even in WASM.
-		// Note: SetTimeZoneOffset takes hours, not minutes.
-		initialOffset := time.GetTimeZoneOffset()
-		time.SetTimeZoneOffset(-5)
-		result = time.LocalMinutesToUnixUTC(1609459200, 9*60, "America/New_York")
-		if result != expected {
-			t.Errorf("LocalMinutesToUnixUTC with offset -5 = %d; want %d", result, expected)
+	for _, c := range cases {
+		if got := time.LocalMinutesToUnixUTC(c.dateSec, c.minutes, c.tz); got != c.expected {
+			t.Errorf("%s: LocalMinutesToUnixUTC(%d, %d, %q) = %d; want %d (off by %+ds)",
+				c.name, c.dateSec, c.minutes, c.tz, got, c.expected, got-c.expected)
 		}
-		time.SetTimeZoneOffset(initialOffset)
 	}
-
-	// Invalid timezone falls back to UTC
-	result = time.LocalMinutesToUnixUTC(1609459200, 9*60, "Invalid/Zone")
-	expectedFallback := int64(1609459200 + 9*3600)
-	if result != expectedFallback {
-		t.Errorf("LocalMinutesToUnixUTC(invalid tz) = %d; want %d (UTC fallback)", result, expectedFallback)
-	}
-
-	t.Logf("LocalMinutesToUnixUTC tests passed")
 }

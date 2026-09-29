@@ -167,10 +167,59 @@ func (tc *timeClient) IsFuture(nano int64) bool {
 	return nano > tc.UnixNano()
 }
 
+// LocalMinutesToUnixUTC resolves tz through the browser's Intl database, at the
+// target date — never the browser's own offset, and never today's offset: a
+// Santiago clinic read in June is UTC-4 even when "now" is UTC-3, whatever zone
+// the viewer's browser is in. An invalid zone falls back to UTC, like the
+// backend's time.LoadLocation path.
 func (tc *timeClient) LocalMinutesToUnixUTC(dateSec int64, localMinutes int, tz string) int64 {
-	offsetSec := int64(getOffsetMinutes()) * 60
-	midnight := MidnightUTC(dateSec)
-	return midnight + int64(localMinutes)*60 - offsetSec
+	wall := MidnightUTC(dateSec) + int64(localMinutes)*60 // the local wall clock, read as if UTC
+	// Two passes, as for any zone conversion: the offset at the first guess can
+	// differ from the offset at the answer when a DST change lies in between.
+	guess := wall - zoneOffsetSec(wall, tz)
+	return wall - zoneOffsetSec(guess, tz)
+}
+
+// zoneOffsetSec is tz's UTC offset in seconds at the instant utcSec: the zone's
+// wall clock at that instant (from Intl), read as UTC, minus the instant.
+// 0 (UTC) when tz is not a zone the runtime knows.
+func zoneOffsetSec(utcSec int64, tz string) (offset int64) {
+	defer func() {
+		if recover() != nil { // Intl throws RangeError on an unknown zone
+			offset = 0
+		}
+	}()
+	opts := js.Global().Get("Object").New()
+	opts.Set("timeZone", tz)
+	opts.Set("hourCycle", "h23")
+	for _, field := range [...]string{"year", "month", "day", "hour", "minute", "second"} {
+		opts.Set(field, "numeric")
+	}
+	fmtr := js.Global().Get("Intl").Get("DateTimeFormat").New("en-US", opts)
+	parts := fmtr.Call("formatToParts", js.Global().Get("Date").New(float64(utcSec)*1000))
+
+	var y, mo, d, h, mi, sec int
+	number := js.Global().Get("Number")
+	for i := 0; i < parts.Length(); i++ {
+		p := parts.Index(i)
+		v := number.Invoke(p.Get("value")).Int()
+		switch p.Get("type").String() {
+		case "year":
+			y = v
+		case "month":
+			mo = v
+		case "day":
+			d = v
+		case "hour":
+			h = v
+		case "minute":
+			mi = v
+		case "second":
+			sec = v
+		}
+	}
+	wallMs := js.Global().Get("Date").Call("UTC", y, mo-1, d, h, mi, sec).Float()
+	return int64(wallMs/1000) - utcSec
 }
 
 type WasmTimer struct {
