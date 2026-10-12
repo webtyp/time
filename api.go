@@ -1,5 +1,7 @@
 package time
 
+import "webtyp.com/date"
+
 // Timer represents a cancelable timer.
 type Timer interface {
 	// Stop prevents the timer from firing. Returns true if the timer was active.
@@ -97,6 +99,40 @@ func MidnightUTC(unixSec int64) int64 {
 		days--
 	}
 	return days * 86400
+}
+
+// Date returns the Unix timestamp in seconds for the given UTC date and time.
+// Pure arithmetic, zero allocations, deterministic in WASM and backend.
+func Date(year, month, day, hour, min, sec int) int64 {
+	days := date.DaysSinceEpoch(year, month, day)
+	return days*86400 + int64(hour*3600+min*60+sec)
+}
+
+// CivilDate converts a Unix timestamp in seconds (UTC) into (year, month, day, hour, min, sec).
+// Pure arithmetic, zero allocations, deterministic in WASM and backend.
+func CivilDate(unixSec int64) (year, month, day, hour, min, sec int) {
+	days := unixSec / 86400
+	rem := unixSec % 86400
+	if rem < 0 {
+		days--
+		rem += 86400
+	}
+	year, month, day = date.FromDaysSinceEpoch(days)
+	hour = int(rem / 3600)
+	rem %= 3600
+	min = int(rem / 60)
+	sec = int(rem % 60)
+	return
+}
+
+// DateKeyToUnix parses a date key "YYYY-MM-DD" and returns the Unix timestamp in seconds
+// for midnight UTC. Returns 0 if dateKey is invalid.
+func DateKeyToUnix(dateKey string) int64 {
+	y, m, d := date.ParseDateKey(dateKey)
+	if y == 0 {
+		return 0
+	}
+	return Date(y, m, d, 0, 0, 0)
 }
 
 // LocalMinutesToUnixUTC converts minutes-from-midnight expressed in a local
