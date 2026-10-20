@@ -83,14 +83,11 @@ func IsFuture(u Unix) bool { return u > NowUnix() }
 // DaysBetween is the number of full days from a to b (negative when b is before a).
 func DaysBetween(a, b Unix) int { return int((b - a) / Day) }
 
-// Weekday returns the day of the week (0=Sunday … 6=Saturday) of an instant, in UTC. 1970-01-01 was a Thursday (4).
+// Weekday returns the day of the week (0=Sunday … 6=Saturday) of an instant, in UTC. The rule is date.Weekday's: this
+// function only turns the instant into its civil date.
 func Weekday(u Unix) int {
-	days := MidnightUTC(u) / Day
-	w := int((days + 4) % 7)
-	if w < 0 {
-		w += 7
-	}
-	return w
+	y, m, d, _, _, _ := CivilDate(u)
+	return date.Weekday(y, m, d)
 }
 
 // MidnightUTC returns midnight UTC of the day that contains the instant.
