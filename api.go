@@ -2,88 +2,90 @@ package time
 
 import "webtyp.com/date"
 
+// Unix is an instant in whole seconds since 1970-01-01 UTC: the unit of dates and deadlines (an expiry, the day of a
+// booking, the end of a session, the exp of a JWT). Every calendar function and every formatter takes a Unix.
+type Unix int64
+
+// Nano is an instant in nanoseconds since 1970-01-01 UTC: the unit of the instant an event happened (created_at,
+// updated_at), fine enough to order two events of the same second. Convert it to a date with its Unix method.
+type Nano int64
+
+// Durations in seconds, typed: NowUnix() + 30*Day compiles; NowNano() + 30*Day does not, because it mixes units.
+const (
+	Minute Unix = 60
+	Hour   Unix = 3600
+	Day    Unix = 86400
+)
+
+const nanosPerSecond = 1000000000
+
+// Unix truncates an event instant to the second, for comparing it with a date or formatting it.
+func (n Nano) Unix() Unix { return Unix(int64(n) / nanosPerSecond) }
+
+// Nano is the first nanosecond of a date's second, for comparing it with an event instant.
+func (u Unix) Nano() Nano { return Nano(int64(u) * nanosPerSecond) }
+
 // Timer represents a cancelable timer.
 type Timer interface {
 	// Stop prevents the timer from firing. Returns true if the timer was active.
 	Stop() bool
 }
 
-// Now retrieves the current Unix timestamp in nanoseconds in UTC.
-func Now() int64 {
-	return provider.UnixNano()
+// NowUnix is the current instant in seconds, for dates and deadlines.
+func NowUnix() Unix { return Unix(provider.UnixNano() / nanosPerSecond) }
+
+// NowNano is the current instant in nanoseconds, for the instant of an event.
+func NowNano() Nano { return Nano(provider.UnixNano()) }
+
+// FormatTime formats an instant as "HH:MM:SS" in the local timezone offset.
+func FormatTime(u Unix) string { return provider.FormatTime(u) }
+
+// FormatMinutes formats minutes since midnight as "HH:MM".
+func FormatMinutes(minutes int) string {
+	return twoDigits(minutes/60) + ":" + twoDigits(minutes%60)
 }
 
-// FormatTime formats a value into a time string "HH:MM:SS" applying the timezone offset.
-func FormatTime(value any) string {
-	return provider.FormatTime(value)
-}
+// FormatDate formats an instant as "YYYY-MM-DD" in the local timezone offset.
+func FormatDate(u Unix) string { return provider.FormatDate(u) }
 
-// FormatDate formats a value into a date string "YYYY-MM-DD" applying the timezone offset.
-func FormatDate(value any) string {
-	return provider.FormatDate(value)
-}
+// FormatDateTime formats an instant as "YYYY-MM-DD HH:MM:SS" in the local timezone offset.
+func FormatDateTime(u Unix) string { return provider.FormatDateTime(u) }
 
-// FormatDateTime formats a value into a date-time string "YYYY-MM-DD HH:MM:SS" applying the timezone offset.
-func FormatDateTime(value any) string {
-	return provider.FormatDateTime(value)
-}
+// FormatDateTimeShort formats an instant as "YYYY-MM-DD HH:MM" in the local timezone offset.
+func FormatDateTimeShort(u Unix) string { return provider.FormatDateTimeShort(u) }
 
-// FormatDateTimeShort formats a value into a short date-time string "YYYY-MM-DD HH:MM".
-func FormatDateTimeShort(value any) string {
-	return provider.FormatDateTimeShort(value)
-}
+// FormatISO8601 formats an instant as "YYYY-MM-DDTHH:MM:SSZ" (UTC).
+func FormatISO8601(u Unix) string { return provider.FormatISO8601(u) }
 
-// FormatISO8601 formats a UnixNano timestamp into an ISO 8601 string (UTC).
-// Format: "YYYY-MM-DDTHH:MM:SSZ"
-func FormatISO8601(nano int64) string {
-	return provider.FormatISO8601(nano)
-}
+// FormatCompact formats an instant as "YYYYMMDDHHmmss" (UTC): PDF metadata, file names.
+func FormatCompact(u Unix) string { return provider.FormatCompact(u) }
 
-// FormatCompact formats a UnixNano timestamp into a compact string "YYYYMMDDHHmmss" (UTC).
-// Useful for PDF metadata dates, file naming, and compact timestamps.
-func FormatCompact(nano int64) string {
-	return provider.FormatCompact(nano)
-}
+// ParseDate parses "YYYY-MM-DD" into the instant of its midnight UTC.
+func ParseDate(dateStr string) (Unix, error) { return provider.ParseDate(dateStr) }
 
-// ParseDate parses a date string ("YYYY-MM-DD") into a UnixNano timestamp (UTC).
-func ParseDate(dateStr string) (int64, error) {
-	return provider.ParseDate(dateStr)
-}
+// ParseTime parses "HH:MM" or "HH:MM:SS" into minutes since midnight.
+func ParseTime(timeStr string) (int16, error) { return provider.ParseTime(timeStr) }
 
-// ParseTime parses a time string into minutes since midnight (UTC).
-func ParseTime(timeStr string) (int16, error) {
-	return provider.ParseTime(timeStr)
-}
-
-// ParseDateTime combines date and time strings into a single UnixNano timestamp (UTC).
-func ParseDateTime(dateStr, timeStr string) (int64, error) {
+// ParseDateTime parses a date ("YYYY-MM-DD") and a time ("HH:MM" or "HH:MM:SS") as UTC.
+func ParseDateTime(dateStr, timeStr string) (Unix, error) {
 	return provider.ParseDateTime(dateStr, timeStr)
 }
 
-// IsToday checks if the given UnixNano timestamp is today according to the current timezone offset.
-func IsToday(nano int64) bool {
-	return provider.IsToday(nano)
-}
+// IsToday reports whether the instant falls on today's date in the local timezone offset.
+func IsToday(u Unix) bool { return provider.IsToday(u) }
 
-// IsPast checks if the given UnixNano timestamp is in the past.
-func IsPast(nano int64) bool {
-	return provider.IsPast(nano)
-}
+// IsPast reports whether the instant is before now.
+func IsPast(u Unix) bool { return u < NowUnix() }
 
-// IsFuture checks if the given UnixNano timestamp is in the future.
-func IsFuture(nano int64) bool {
-	return provider.IsFuture(nano)
-}
+// IsFuture reports whether the instant is after now.
+func IsFuture(u Unix) bool { return u > NowUnix() }
 
-// DaysBetween calculates the number of full days between two UnixNano timestamps.
-func DaysBetween(nano1, nano2 int64) int {
-	return DaysBetweenShared(nano1, nano2)
-}
+// DaysBetween is the number of full days from a to b (negative when b is before a).
+func DaysBetween(a, b Unix) int { return int((b - a) / Day) }
 
-// Weekday returns the day of the week (0=Sunday … 6=Saturday) for a Unix
-// timestamp in seconds (UTC). Based on the fact that 1970-01-01 was a Thursday (4).
-func Weekday(unixSec int64) int {
-	days := MidnightUTC(unixSec) / 86400
+// Weekday returns the day of the week (0=Sunday … 6=Saturday) of an instant, in UTC. 1970-01-01 was a Thursday (4).
+func Weekday(u Unix) int {
+	days := MidnightUTC(u) / Day
 	w := int((days + 4) % 7)
 	if w < 0 {
 		w += 7
@@ -91,28 +93,25 @@ func Weekday(unixSec int64) int {
 	return w
 }
 
-// MidnightUTC returns the Unix timestamp in seconds for midnight UTC of the
-// day that contains the given Unix timestamp in seconds.
-func MidnightUTC(unixSec int64) int64 {
-	days := unixSec / 86400
-	if unixSec < 0 && unixSec%86400 != 0 {
+// MidnightUTC returns midnight UTC of the day that contains the instant.
+func MidnightUTC(u Unix) Unix {
+	days := u / Day
+	if u < 0 && u%Day != 0 {
 		days--
 	}
-	return days * 86400
+	return days * Day
 }
 
-// Date returns the Unix timestamp in seconds for the given UTC date and time.
-// Pure arithmetic, zero allocations, deterministic in WASM and backend.
-func Date(year, month, day, hour, min, sec int) int64 {
+// Date returns the instant of a UTC date and time. Pure arithmetic, deterministic in WASM and backend.
+func Date(year, month, day, hour, min, sec int) Unix {
 	days := date.DaysSinceEpoch(year, month, day)
-	return days*86400 + int64(hour*3600+min*60+sec)
+	return Unix(days*86400 + int64(hour*3600+min*60+sec))
 }
 
-// CivilDate converts a Unix timestamp in seconds (UTC) into (year, month, day, hour, min, sec).
-// Pure arithmetic, zero allocations, deterministic in WASM and backend.
-func CivilDate(unixSec int64) (year, month, day, hour, min, sec int) {
-	days := unixSec / 86400
-	rem := unixSec % 86400
+// CivilDate splits an instant (UTC) into year, month, day, hour, minute and second.
+func CivilDate(u Unix) (year, month, day, hour, min, sec int) {
+	days := int64(u) / 86400
+	rem := int64(u) % 86400
 	if rem < 0 {
 		days--
 		rem += 86400
@@ -125,46 +124,36 @@ func CivilDate(unixSec int64) (year, month, day, hour, min, sec int) {
 	return
 }
 
-// DateKeyToUnix parses a date key "YYYY-MM-DD" and returns the Unix timestamp in seconds
-// for midnight UTC. Returns 0 if dateKey is invalid.
-func DateKeyToUnix(dateKey string) int64 {
-	y, m, d := date.ParseDateKey(dateKey)
-	if y == 0 {
-		return 0
-	}
-	return Date(y, m, d, 0, 0, 0)
-}
-
-// LocalMinutesToUnixUTC converts minutes-from-midnight expressed in a local
-// timezone into a UTC Unix timestamp in seconds for the given date.
-// dateSec is a Unix timestamp in seconds (UTC) that identifies the target date.
-// localMinutes is minutes elapsed since midnight in the local timezone.
-// tz is an IANA timezone name (e.g. "America/New_York"); falls back to UTC if invalid.
-func LocalMinutesToUnixUTC(dateSec int64, localMinutes int, tz string) int64 {
-	return provider.LocalMinutesToUnixUTC(dateSec, localMinutes, tz)
+// LocalMinutesToUnixUTC converts minutes since midnight in the IANA zone tz, on the date that contains dateUTC, into a
+// UTC instant. An unknown zone falls back to UTC.
+func LocalMinutesToUnixUTC(dateUTC Unix, localMinutes int, tz string) Unix {
+	return provider.LocalMinutesToUnixUTC(dateUTC, localMinutes, tz)
 }
 
 // AfterFunc waits for the specified milliseconds then calls f.
-func AfterFunc(milliseconds int, f func()) Timer {
-	return provider.AfterFunc(milliseconds, f)
+func AfterFunc(milliseconds int, f func()) Timer { return provider.AfterFunc(milliseconds, f) }
+
+func twoDigits(n int) string {
+	if n < 10 {
+		return "0" + string(rune('0'+n))
+	}
+	return string(rune('0'+n/10)) + string(rune('0'+n%10))
 }
 
-// Internal interface for the singleton provider
+// timeProvider is what each platform (standard Go, WASM) supplies.
 type timeProvider interface {
 	UnixNano() int64
-	FormatDate(value any) string
-	FormatTime(value any) string
-	FormatDateTime(value any) string
-	FormatDateTimeShort(value any) string
-	FormatISO8601(nano int64) string
-	FormatCompact(nano int64) string
-	ParseDate(dateStr string) (int64, error)
+	FormatDate(u Unix) string
+	FormatTime(u Unix) string
+	FormatDateTime(u Unix) string
+	FormatDateTimeShort(u Unix) string
+	FormatISO8601(u Unix) string
+	FormatCompact(u Unix) string
+	ParseDate(dateStr string) (Unix, error)
 	ParseTime(timeStr string) (int16, error)
-	ParseDateTime(dateStr, timeStr string) (int64, error)
-	IsToday(nano int64) bool
-	IsPast(nano int64) bool
-	IsFuture(nano int64) bool
-	LocalMinutesToUnixUTC(dateSec int64, localMinutes int, tz string) int64
+	ParseDateTime(dateStr, timeStr string) (Unix, error)
+	IsToday(u Unix) bool
+	LocalMinutesToUnixUTC(dateUTC Unix, localMinutes int, tz string) Unix
 	AfterFunc(milliseconds int, f func()) Timer
 }
 

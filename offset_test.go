@@ -28,7 +28,7 @@ func TestTimeZoneOffset(t *testing.T) {
 
 func TestFormatWithOffset(t *testing.T) {
 	// 2021-01-01 00:00:00 UTC
-	nano := int64(1609459200 * 1000000000)
+	nano := time.Unix(1609459200)
 
 	// In UTC
 	time.SetTimeZoneOffset(0)
@@ -52,7 +52,7 @@ func TestFormatWithOffset(t *testing.T) {
 func TestIsTodayWithOffset(t *testing.T) {
 	// Near midnight UTC
 	// 2021-01-02 01:00:00 UTC
-	nano := int64(1609549200 * 1000000000)
+	nano := time.Unix(1609549200)
 
 	// If it's 2021-01-02 01:00:00 UTC
 	// In UTC-3 it's 2021-01-01 22:00:00 (Previous day)

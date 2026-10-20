@@ -20,10 +20,3 @@ func parseTime(timeStr string) (int16, error) {
 	}
 	return int16(hours*60 + minutes), nil
 }
-
-// DaysBetweenShared is a shared helper function for calculating the number of full days between two timestamps.
-func DaysBetweenShared(nano1, nano2 int64) int {
-	// 86400000000000 nanoseconds in a day
-	const nanosInDay = 86400000000000
-	return int((nano2 - nano1) / nanosInDay)
-}

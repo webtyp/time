@@ -3,124 +3,70 @@
 
 A minimal, portable time utility for Go and TinyGo with WebAssembly support. Automatically handles timezones and uses JavaScript Date APIs in WASM environments to keep binaries small.
 
+## The two units — read this first
+
+Every instant has its unit in its **type**, so mixing them does not compile:
+
+| Type | Unit | Use it for | Clock |
+|---|---|---|---|
+| `time.Unix` | seconds since 1970-01-01 UTC | **dates and deadlines**: an expiry, the day of a booking, the end of a session, a JWT `exp` | `time.NowUnix()` |
+| `time.Nano` | nanoseconds since 1970-01-01 UTC | **the instant an event happened**: `created_at`, `updated_at`; orders two events of the same second | `time.NowNano()` |
+
+- Durations are typed seconds: `time.Minute`, `time.Hour`, `time.Day` (`time.Unix`). `time.NowUnix() + 30*time.Day`
+  compiles; `time.NowNano() + 30*time.Day` does not.
+- An event compared with a date or formatted: `n.Unix()`; a date compared with an event: `u.Nano()`. Never divide or
+  multiply by 1e9.
+- A model field that holds an instant is declared `model.UnixTime()` or `model.NanoTime()`; `ormc` generates it as
+  `time.Unix` or `time.Nano`.
+- The only arithmetic conversion left is at the border of an external format (a JWT, an OS API), written once in the
+  library that speaks that format.
+
 ## Quick Start
 
 ```go
 import "webtyp.com/time"
 
-func main() {
-    // Get current Unix timestamp in nanoseconds (UTC)
-    nano := time.Now()
-    println("Current time:", nano)
+expiry := time.NowUnix() + 30*time.Day     // a deadline
+println(time.FormatDate(expiry))           // "YYYY-MM-DD", local offset
 
-    // Format dates and times (Using detected local timezone)
-    date := time.FormatDate(nano)
-    println("Local Date:", date)
+created := time.NowNano()                   // an event
+println(time.FormatDateTime(created.Unix())) // "YYYY-MM-DD HH:MM:SS", local offset
 
-    timeStr := time.FormatTime(nano)
-    println("Local Time:", timeStr)
-
-    // Set custom timezone offset manually (e.g. UTC-3)
-    time.SetTimeZoneOffset(-180) 
-    println("New Local Time:", time.FormatTime(nano))
-
-    // Parse date and time strings (Always UTC)
-    parsedNano, err := time.ParseDate("2024-01-15")
-    if err != nil {
-        panic(err)
-    }
-    println("Parsed UTC Nano:", parsedNano)
-
-    // Perform date calculations
-    isToday := time.IsToday(nano)
-    println("Is Today (Local)?", isToday)
-
-    // Compact format (UTC, no separators)
-    compact := time.FormatCompact(nano)
-    println("Compact:", compact) // "20260402153045"
+day, err := time.ParseDate("2024-01-15")    // midnight UTC, time.Unix
+if err != nil {
+    panic(err)
 }
+println(time.Weekday(day), time.IsPast(day))
 ```
 
 ## Timezone Support
 
-TinyTime automatically detects the local timezone offset:
-- **Standard Go**: Uses `time.Now().Zone()`.
-- **WASM**: Uses JavaScript `Date.getTimezoneOffset()`.
+The display formatters apply the detected local offset:
+- **Standard Go**: `time.Now().Zone()`.
+- **WASM**: `Date.getTimezoneOffset()`.
 
-### `SetTimeZoneOffset(offsetMinutes int)`
-Sets the manual timezone offset in minutes from UTC.
-
-### `GetTimeZoneOffset() int`
-Returns the current active timezone offset in minutes.
+`SetTimeZoneOffset(hours int)` sets it by hand; `GetTimeZoneOffset() int` reads it. `LocalMinutesToUnixUTC` instead
+takes an explicit IANA zone and never uses this offset.
 
 ---
 
 ## API Reference
 
-### Display Formatting
-**⚠️ IMPORTANT:** All formatting functions below (`FormatDate`, `FormatTime`, `FormatDateTime`, etc.) automatically apply the current timezone offset to display **local time**. If you need raw UTC time, use `FormatISO8601` instead.
-
-#### `FormatDate(value any) string`
-Formats a value into a date string: "YYYY-MM-DD".
-- **`int64`**: UnixNano timestamp.
-- **`string`**: Valid date string (passthrough).
-
-#### `FormatTime(value any) string`
-Formats a value into a time string "HH:MM:SS" (or "HH:MM" for `int16`).
-- **`int64`**: UnixNano timestamp.
-- **`int16`**: Minutes since midnight.
-- **`string`**: Valid time string (passthrough).
-
-#### `FormatDateTime(value any) string`
-Formats a value into a date-time string: "YYYY-MM-DD HH:MM:SS".
-
-#### `FormatDateTimeShort(value any) string`
-Formats a value into a short date-time string: "YYYY-MM-DD HH:MM".
-
-#### `FormatISO8601(nano int64) string`
-Formats a UnixNano timestamp into an ISO 8601 string: "YYYY-MM-DDTHH:MM:SSZ".
-Unlike other formatting functions, this strictly outputs **UTC time** and ignores any local timezone offsets. Often used for DB records, HL7/FHIR, and REST APIs.
-
-#### `FormatCompact(nano int64) string`
-Formats a UnixNano timestamp into a compact string: "YYYYMMDDHHmmss".
-Outputs **UTC time**, ignoring timezone offsets. Useful for PDF metadata dates, file naming, and compact timestamps.
-
----
-
-### Parsing
-All parsing functions assume UTC input and return UTC timestamps.
-
-#### `ParseDate(dateStr string) (int64, error)`
-Parses a date string ("YYYY-MM-DD") into a UnixNano timestamp at midnight UTC.
-
-#### `ParseTime(timeStr string) (int16, error)`
-Parses a time string ("HH:MM" or "HH:MM:SS") into minutes since midnight UTC.
-
-#### `ParseDateTime(dateStr, timeStr string) (int64, error)`
-Combines date and time strings into a single UnixNano timestamp (UTC).
-
----
-
-### Current Time
-
-#### `Now() int64`
-Returns the current Unix timestamp in nanoseconds (UTC).
-
----
-
-### Date Utilities
-
-#### `IsToday(nano int64) bool`
-Checks if the given UnixNano timestamp is today based on the local timezone offset.
-
-#### `IsPast(nano int64) bool`
-Checks if the given UnixNano timestamp is in the past.
-
-#### `IsFuture(nano int64) bool`
-Checks if the given UnixNano timestamp is in the future.
-
-#### `DaysBetween(nano1, nano2 int64) int`
-Calculates the number of full days between two UnixNano timestamps.
+| Function | Does |
+|---|---|
+| `NowUnix() Unix`, `NowNano() Nano` | the two clocks |
+| `(Nano) Unix() Unix`, `(Unix) Nano() Nano` | explicit conversion between the two units |
+| `FormatDate(Unix)`, `FormatTime(Unix)`, `FormatDateTime(Unix)`, `FormatDateTimeShort(Unix)` | "YYYY-MM-DD", "HH:MM:SS", both, "YYYY-MM-DD HH:MM", **local offset** |
+| `FormatISO8601(Unix)`, `FormatCompact(Unix)` | "YYYY-MM-DDTHH:MM:SSZ" and "YYYYMMDDHHmmss", **UTC** |
+| `FormatMinutes(int)` | minutes since midnight → "HH:MM" |
+| `ParseDate(string) (Unix, error)` | "YYYY-MM-DD" → its midnight UTC |
+| `ParseTime(string) (int16, error)` | "HH:MM[:SS]" → minutes since midnight |
+| `ParseDateTime(date, time string) (Unix, error)` | both, read as UTC |
+| `IsToday(Unix)`, `IsPast(Unix)`, `IsFuture(Unix)` | relative to now (today in the local offset) |
+| `DaysBetween(a, b Unix) int` | full days from a to b |
+| `Weekday(Unix) int`, `MidnightUTC(Unix) Unix` | 0 = Sunday; start of the UTC day |
+| `Date(y, m, d, h, min, s int) Unix`, `CivilDate(Unix)` | civil date ↔ instant, pure arithmetic |
+| `LocalMinutesToUnixUTC(date Unix, minutes int, tz string) Unix` | a local wall-clock time in an IANA zone → UTC instant |
 
 ---
 
