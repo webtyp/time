@@ -1,6 +1,6 @@
 package time
 
-import "webtyp.com/date"
+import "webtyp.com/calendar"
 
 // Unix is an instant in whole seconds since 1970-01-01 UTC: the unit of dates and deadlines (an expiry, the day of a
 // booking, the end of a session, the exp of a JWT). Every calendar function and every formatter takes a Unix.
@@ -83,11 +83,11 @@ func IsFuture(u Unix) bool { return u > NowUnix() }
 // DaysBetween is the number of full days from a to b (negative when b is before a).
 func DaysBetween(a, b Unix) int { return int((b - a) / Day) }
 
-// Weekday returns the day of the week (0=Sunday … 6=Saturday) of an instant, in UTC. The rule is date.Weekday's: this
+// Weekday returns the day of the week (0=Sunday … 6=Saturday) of an instant, in UTC. The rule is calendar.Weekday's: this
 // function only turns the instant into its civil date.
 func Weekday(u Unix) int {
 	y, m, d, _, _, _ := CivilDate(u)
-	return date.Weekday(y, m, d)
+	return calendar.Weekday(y, m, d)
 }
 
 // MidnightUTC returns midnight UTC of the day that contains the instant.
@@ -101,7 +101,7 @@ func MidnightUTC(u Unix) Unix {
 
 // Date returns the instant of a UTC date and time. Pure arithmetic, deterministic in WASM and backend.
 func Date(year, month, day, hour, min, sec int) Unix {
-	days := date.DaysSinceEpoch(year, month, day)
+	days := calendar.DaysSinceEpoch(year, month, day)
 	return Unix(days*86400 + int64(hour*3600+min*60+sec))
 }
 
@@ -113,7 +113,7 @@ func CivilDate(u Unix) (year, month, day, hour, min, sec int) {
 		days--
 		rem += 86400
 	}
-	year, month, day = date.FromDaysSinceEpoch(days)
+	year, month, day = calendar.FromDaysSinceEpoch(days)
 	hour = int(rem / 3600)
 	rem %= 3600
 	min = int(rem / 60)

@@ -20,22 +20,22 @@ Why two units and not one: event instants need nanoseconds to keep their order w
 exchanged in seconds (JWT, calendars, stored bookings and sessions). Splitting by purpose removed every conversion
 without migrating stored data.
 
-## Layering: `time` imports `date`, never the reverse
+## Layering: `time` imports `calendar`, never the reverse
 
-`webtyp/date` is the **civil calendar**: years, months and days as plain integers (leap years, days in a month, the
+`webtyp/calendar` is the **civil calendar**: years, months and days as plain integers (leap years, days in a month, the
 weekday of a date, month names, "YYYY-MM-DD" keys). It has no clock, no timezone, no instant and no platform code, and
 depends on nothing but `webtyp/fmt`.
 
 `webtyp/time` sits **on top of it**: to turn an instant into "2024-01-15" it counts days since the epoch and asks
-`date` for the civil date (`Date`, `CivilDate`, `Weekday` all delegate the calendar rule to `date`). Turning an
+`calendar` for the civil date (`Date`, `CivilDate`, `Weekday` all delegate the calendar rule to `calendar`). Turning an
 instant into a date belongs here because only this library knows what an instant is.
 
 The dependency points from the library with platform code (a standard-Go provider and a WASM provider over the
 JavaScript `Date`) to the pure one, for three reasons:
 
-1. **Pure at the bottom.** If `date` imported `time`, everything that only needs the calendar (a month grid, the days
+1. **Pure at the bottom.** If `calendar` imported `time`, everything that only needs the calendar (a month grid, the days
    of February) would pull in the clock and its platform providers.
-2. **Calendar users exist without a clock.** `components/scheduleeditor` walks months with `date` alone.
+2. **Calendar users exist without a clock.** `components/scheduleeditor` walks months with `calendar` alone.
 3. **Change flows one way.** A change in the clock or the timezone never forces a review of the calendar arithmetic.
 
 ## Platforms

@@ -5,7 +5,7 @@ A minimal, portable time utility for Go and TinyGo with WebAssembly support. Aut
 
 ## The two units — read this first
 
-Why, and how `time` and `date` divide the work: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Why, and how `time` and `calendar` divide the work: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 Every instant has its unit in its **type**, so mixing them does not compile:
 
