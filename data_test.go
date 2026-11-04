@@ -15,14 +15,8 @@ func FormatShared(t *testing.T) {
 		got  string
 		want string
 	}{
-		{"FormatDate", time.FormatDate(jan15), "2024-01-15"},
-		{"FormatTime", time.FormatTime(jan15), "15:30:45"},
-		{"FormatDateTime", time.FormatDateTime(jan15), "2024-01-15 15:30:45"},
-		{"FormatDateTimeShort", time.FormatDateTimeShort(jan15), "2024-01-15 15:30"},
 		{"FormatISO8601", time.FormatISO8601(jan15), "2024-01-15T15:30:45Z"},
 		{"FormatCompact", time.FormatCompact(jan15), "20240115153045"},
-		{"FormatDate epoch", time.FormatDate(0), "1970-01-01"},
-		{"FormatDateTimeShort epoch", time.FormatDateTimeShort(0), "1970-01-01 00:00"},
 		{"FormatCompact epoch", time.FormatCompact(0), "19700101000000"},
 		{"FormatMinutes", time.FormatMinutes(510), "08:30"},
 		{"FormatMinutes midnight", time.FormatMinutes(0), "00:00"},
@@ -32,20 +26,6 @@ func FormatShared(t *testing.T) {
 		if c.got != c.want {
 			t.Errorf("%s = %q, want %q", c.name, c.got, c.want)
 		}
-	}
-}
-
-// FormatOffsetShared: the local formatters apply the timezone offset; ISO and compact stay UTC.
-func FormatOffsetShared(t *testing.T) {
-	initial := time.GetTimeZoneOffset()
-	time.SetTimeZoneOffset(-3)
-	defer time.SetTimeZoneOffset(initial)
-
-	if got := time.FormatDateTime(jan15); got != "2024-01-15 12:30:45" {
-		t.Errorf("FormatDateTime at UTC-3 = %q, want 2024-01-15 12:30:45", got)
-	}
-	if got := time.FormatISO8601(jan15); got != "2024-01-15T15:30:45Z" {
-		t.Errorf("FormatISO8601 must ignore the offset, got %q", got)
 	}
 }
 
@@ -69,12 +49,12 @@ func ClocksShared(t *testing.T) {
 }
 
 func ParseDateShared(t *testing.T) {
-	got, err := time.ParseDate("2024-01-15")
+	got, err := time.ParseDateUTC("2024-01-15")
 	if err != nil || got != 1705276800 {
 		t.Errorf("ParseDate(2024-01-15) = %d, %v; want 1705276800 (midnight UTC, seconds)", got, err)
 	}
 	for _, bad := range []string{"invalid", "2024-02-30", "2024-1-1", "20240-1-15"} {
-		if _, err := time.ParseDate(bad); err == nil {
+		if _, err := time.ParseDateUTC(bad); err == nil {
 			t.Errorf("ParseDate(%q) must fail", bad)
 		}
 	}
@@ -96,25 +76,8 @@ func ParseTimeShared(t *testing.T) {
 	}
 }
 
-func ParseDateTimeShared(t *testing.T) {
-	for _, tm := range []string{"08:30", "08:30:00"} {
-		if got, err := time.ParseDateTime("2024-01-15", tm); err != nil || got != 1705307400 {
-			t.Errorf("ParseDateTime(2024-01-15, %s) = %d, %v; want 1705307400", tm, got, err)
-		}
-	}
-	if _, err := time.ParseDateTime("invalid", "08:30"); err == nil {
-		t.Error("ParseDateTime(invalid date) must fail")
-	}
-	if _, err := time.ParseDateTime("2024-01-15", "invalid"); err == nil {
-		t.Error("ParseDateTime(invalid time) must fail")
-	}
-}
-
 func RelativeShared(t *testing.T) {
 	now := time.NowUnix()
-	if !time.IsToday(now) || time.IsToday(now-time.Day) || time.IsToday(now+time.Day) {
-		t.Error("IsToday: now is today, yesterday and tomorrow are not")
-	}
 	if !time.IsPast(now-time.Minute) || time.IsPast(now+time.Minute) {
 		t.Error("IsPast")
 	}
@@ -139,7 +102,7 @@ func CalendarShared(t *testing.T) {
 		{-5 * time.Day, 6},
 	}
 	for _, c := range weekdays {
-		if got := time.Weekday(c.at); got != c.want {
+		if got := time.WeekdayUTC(c.at); got != c.want {
 			t.Errorf("Weekday(%d) = %d, want %d", c.at, got, c.want)
 		}
 	}
@@ -157,30 +120,77 @@ func CalendarShared(t *testing.T) {
 	}
 }
 
-// LocalMinutesToUnixUTCShared: the tz argument is authoritative on every backend; the global offset must never leak
-// into a conversion that names its zone.
-func LocalMinutesToUnixUTCShared(t *testing.T) {
-	initialOffset := time.GetTimeZoneOffset()
-	time.SetTimeZoneOffset(7)
-	defer time.SetTimeZoneOffset(initialOffset)
-
-	cases := []struct {
-		name     string
-		date     time.Unix
-		minutes  int
-		tz       string
-		expected time.Unix
-	}{
-		{"UTC", 1609459200, 9 * 60, "UTC", 1609459200 + 9*time.Hour},
-		{"New York winter (UTC-5)", 1609459200, 9 * 60, "America/New_York", 1609459200 + 14*time.Hour},
-		{"New York summer (UTC-4)", 1625097600, 9 * 60, "America/New_York", 1625097600 + 13*time.Hour},
-		{"Santiago summer (UTC-3)", 1799971200, 9 * 60, "America/Santiago", 1799971200 + 12*time.Hour},
-		{"Santiago winter (UTC-4)", 1812672000, 9 * 60, "America/Santiago", 1812672000 + 13*time.Hour},
-		{"invalid zone falls back to UTC", 1609459200, 9 * 60, "Invalid/Zone", 1609459200 + 9*time.Hour},
+// ZoneShared: every local date and time comes from a loaded zone, with that zone's offset at that instant.
+func ZoneShared(t *testing.T) {
+	if _, err := time.LoadZone("Invalid/Zone"); err != time.ErrUnknownZone {
+		t.Errorf("LoadZone(invalid) = %v, want ErrUnknownZone (never UTC in silence)", err)
 	}
-	for _, c := range cases {
-		if got := time.LocalMinutesToUnixUTC(c.date, c.minutes, c.tz); got != c.expected {
-			t.Errorf("%s: got %d, want %d (off by %+ds)", c.name, got, c.expected, got-c.expected)
+	if _, err := time.LoadZone(""); err != time.ErrUnknownZone {
+		t.Errorf("LoadZone(\"\") = %v, want ErrUnknownZone", err)
+	}
+	scl, err := time.LoadZone("America/Santiago")
+	if err != nil {
+		t.Fatalf("LoadZone(America/Santiago): %v", err)
+	}
+	ny, _ := time.LoadZone("America/New_York")
+	utc, _ := time.LoadZone("UTC")
+
+	at := []struct {
+		name    string
+		zone    time.Zone
+		date    string
+		minutes int
+		want    time.Unix
+	}{
+		{"UTC", utc, "2021-01-01", 9 * 60, 1609459200 + 9*time.Hour},
+		{"New York winter (UTC-5)", ny, "2021-01-01", 9 * 60, 1609459200 + 14*time.Hour},
+		{"New York summer (UTC-4)", ny, "2021-07-01", 9 * 60, 1625097600 + 13*time.Hour},
+		{"Santiago summer (UTC-3)", scl, "2027-01-15", 9 * 60, 1799971200 + 12*time.Hour},
+		{"Santiago winter (UTC-4)", scl, "2027-06-11", 9 * 60, 1812672000 + 13*time.Hour},
+		{"Santiago winter night: next UTC day", scl, "2019-07-15", 21*60 + 30, 1563240600},
+	}
+	for _, c := range at {
+		got, err := c.zone.At(c.date, c.minutes)
+		if err != nil || got != c.want {
+			t.Errorf("At %s: got %d %v, want %d (off by %+ds)", c.name, got, err, c.want, got-c.want)
 		}
 	}
+
+	night := time.Unix(1563240600) // 2019-07-16 01:30 UTC = 2019-07-15 21:30 in Santiago (winter)
+	if scl.Date(night) != "2019-07-15" || scl.Clock(night) != "21:30" || scl.DateTime(night) != "2019-07-15 21:30" {
+		t.Errorf("Santiago night = %s %s, want 2019-07-15 21:30", scl.Date(night), scl.Clock(night))
+	}
+	if scl.Minutes(night) != 21*60+30 || scl.Weekday(night) != 1 || time.WeekdayUTC(night) != 2 {
+		t.Errorf("Minutes %d Weekday %d (want 1290, Monday=1; UTC is Tuesday=2)", scl.Minutes(night), scl.Weekday(night))
+	}
+	if scl.Offset(night) != -4*3600 || scl.Offset(1799971200) != -3*3600 {
+		t.Errorf("Offset winter %d summer %d, want -14400 -10800", scl.Offset(night), scl.Offset(1799971200))
+	}
+
+	from, to, err := scl.Day("2019-07-15")
+	if err != nil || from != 1563163200 || to != 1563249600 || !(from <= night && night < to) {
+		t.Errorf("Day(2019-07-15) = [%d, %d) %v; want [1563163200, 1563249600) containing the night booking", from, to, err)
+	}
+	if _, err := scl.At("2019-07-15", 24*60); err == nil {
+		t.Error("At with minutes 1440 must fail")
+	}
+	if _, err := scl.At("2019-02-30", 0); err == nil {
+		t.Error("At with an impossible date must fail")
+	}
+
+	now := time.NowUnix()
+	if !scl.IsToday(now) || scl.IsToday(now-time.Day) || scl.IsToday(now+time.Day) {
+		t.Error("IsToday: now is today, yesterday and tomorrow are not")
+	}
+	if time.MachineZone().Name() == "" {
+		t.Error("MachineZone must report a name")
+	}
+
+	defer func() {
+		if recover() == nil {
+			t.Error("a Zone not loaded must panic, never act as UTC")
+		}
+	}()
+	var zero time.Zone
+	zero.Date(now)
 }

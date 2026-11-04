@@ -28,27 +28,30 @@ Every instant has its unit in its **type**, so mixing them does not compile:
 ```go
 import "webtyp.com/time"
 
-expiry := time.NowUnix() + 30*time.Day     // a deadline
-println(time.FormatDate(expiry))           // "YYYY-MM-DD", local offset
-
-created := time.NowNano()                   // an event
-println(time.FormatDateTime(created.Unix())) // "YYYY-MM-DD HH:MM:SS", local offset
-
-day, err := time.ParseDate("2024-01-15")    // midnight UTC, time.Unix
+zone, err := time.LoadZone("America/Santiago") // the place's clock; unknown name → ErrUnknownZone
 if err != nil {
     panic(err)
 }
-println(time.Weekday(day), time.IsPast(day))
+start, err := zone.At("2019-07-15", 21*60+30)   // a local date and time → the instant (2019-07-16 01:30 UTC)
+println(zone.Date(start), zone.Clock(start))    // "2019-07-15" "21:30" — winter, UTC-4, read correctly any day
+from, to, err := zone.Day("2019-07-15")          // the day's instants: search with from <= start < to
+
+expiry := time.NowUnix() + 30*time.Day          // a deadline is an instant, in no place
+println(time.FormatISO8601(expiry), time.IsPast(expiry))
 ```
 
-## Timezone Support
+## Time zones — one way, always explicit
 
-The display formatters apply the detected local offset:
-- **Standard Go**: `time.Now().Zone()`.
-- **WASM**: `Date.getTimezoneOffset()`.
+There is **no implicit "local time"**: every local date or hour comes from a `Zone` loaded by name. The offset is the
+zone's **at that instant** (summer and winter time included), never "the offset of the machine when it started".
 
-`SetTimeZoneOffset(hours int)` sets it by hand; `GetTimeZoneOffset() int` reads it. `LocalMinutesToUnixUTC` instead
-takes an explicit IANA zone and never uses this offset.
+- **Server:** the IANA database is embedded (`time/tzdata`), so a Docker image with no zone files and no `TZ` still
+  knows `America/Santiago`.
+- **Browser:** the browser's `Intl` database, at no cost in the `.wasm` file. A clinic's schedule shows the clinic's
+  hour even to a visitor in another country.
+- **An app** loads its installation's zone once (`appkit.App.Timezone`). `MachineZone()` — this computer's zone — is
+  only for tools (logs, a terminal UI).
+- What is UTC says so in its name: `DateUTC`, `CivilUTC`, `WeekdayUTC`, `ParseDateUTC`, `MidnightUTC`, `FormatISO8601`.
 
 ---
 
@@ -58,17 +61,18 @@ takes an explicit IANA zone and never uses this offset.
 |---|---|
 | `NowUnix() Unix`, `NowNano() Nano` | the two clocks |
 | `(Nano) Unix() Unix`, `(Unix) Nano() Nano` | explicit conversion between the two units |
-| `FormatDate(Unix)`, `FormatTime(Unix)`, `FormatDateTime(Unix)`, `FormatDateTimeShort(Unix)` | "YYYY-MM-DD", "HH:MM:SS", both, "YYYY-MM-DD HH:MM", **local offset** |
+| `LoadZone(name) (Zone, error)`, `MachineZone() Zone` | a place's clock / this computer's clock (tools only) |
+| `(Zone) At(date, minutes) (Unix, error)` | a local date ("YYYY-MM-DD") and minutes since its midnight → the instant |
+| `(Zone) Day(date) (from, to Unix, error)` | the instants of a local day, `[from, to)` |
+| `(Zone) Date(Unix)`, `Clock(Unix)`, `DateTime(Unix)` | "YYYY-MM-DD", "HH:MM", both — in the zone |
+| `(Zone) Minutes(Unix)`, `Weekday(Unix)`, `IsToday(Unix)`, `Offset(Unix)`, `Name()` | minutes since local midnight; 0 = Sunday; today there; seconds from UTC |
 | `FormatISO8601(Unix)`, `FormatCompact(Unix)` | "YYYY-MM-DDTHH:MM:SSZ" and "YYYYMMDDHHmmss", **UTC** |
 | `FormatMinutes(int)` | minutes since midnight → "HH:MM" |
-| `ParseDate(string) (Unix, error)` | "YYYY-MM-DD" → its midnight UTC |
+| `ParseDateUTC(string) (Unix, error)` | "YYYY-MM-DD" → its midnight UTC (a date as a key) |
 | `ParseTime(string) (int16, error)` | "HH:MM[:SS]" → minutes since midnight |
-| `ParseDateTime(date, time string) (Unix, error)` | both, read as UTC |
-| `IsToday(Unix)`, `IsPast(Unix)`, `IsFuture(Unix)` | relative to now (today in the local offset) |
-| `DaysBetween(a, b Unix) int` | full days from a to b |
-| `Weekday(Unix) int`, `MidnightUTC(Unix) Unix` | 0 = Sunday; start of the UTC day |
-| `Date(y, m, d, h, min, s int) Unix`, `CivilDate(Unix)` | civil date ↔ instant, pure arithmetic |
-| `LocalMinutesToUnixUTC(date Unix, minutes int, tz string) Unix` | a local wall-clock time in an IANA zone → UTC instant |
+| `IsPast(Unix)`, `IsFuture(Unix)`, `DaysBetween(a, b Unix) int` | relative to now; full days from a to b |
+| `WeekdayUTC(Unix) int`, `MidnightUTC(Unix) Unix` | 0 = Sunday, in UTC; start of the UTC day |
+| `DateUTC(y, m, d, h, min, s int) Unix`, `CivilUTC(Unix)` | UTC civil date ↔ instant, pure arithmetic |
 
 ---
 

@@ -19,12 +19,12 @@ func TestDateAndCivilDate(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got := time.Date(c.y, c.m, c.d, c.h, c.min, c.s)
+		got := time.DateUTC(c.y, c.m, c.d, c.h, c.min, c.s)
 		if got != c.wantSec {
 			t.Errorf("Date(%d,%d,%d,%d,%d,%d) = %d, want %d", c.y, c.m, c.d, c.h, c.min, c.s, got, c.wantSec)
 		}
 
-		ry, rm, rd, rh, rmin, rs := time.CivilDate(got)
+		ry, rm, rd, rh, rmin, rs := time.CivilUTC(got)
 		if ry != c.y || rm != c.m || rd != c.d || rh != c.h || rmin != c.min || rs != c.s {
 			t.Errorf("CivilDate(%d) = (%d,%d,%d,%d,%d,%d), want (%d,%d,%d,%d,%d,%d)",
 				got, ry, rm, rd, rh, rmin, rs, c.y, c.m, c.d, c.h, c.min, c.s)

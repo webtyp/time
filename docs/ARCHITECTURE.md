@@ -27,7 +27,7 @@ weekday of a date, month names, "YYYY-MM-DD" keys). It has no clock, no timezone
 depends on nothing but `webtyp/fmt`.
 
 `webtyp/time` sits **on top of it**: to turn an instant into "2024-01-15" it counts days since the epoch and asks
-`calendar` for the civil date (`Date`, `CivilDate`, `Weekday` all delegate the calendar rule to `calendar`). Turning an
+`calendar` for the civil date (`DateUTC`, `CivilUTC`, `WeekdayUTC` all delegate the calendar rule to `calendar`). Turning an
 instant into a date belongs here because only this library knows what an instant is.
 
 The dependency points from the library with platform code (a standard-Go provider and a WASM provider over the
@@ -42,3 +42,14 @@ JavaScript `Date`) to the pure one, for three reasons:
 
 `backStlib.go` (`!wasm`) implements the provider over Go's `time`; `frontWasm.go` (`wasm`) over the JavaScript `Date`
 and `Intl` (for named IANA zones). Both run the same shared tests (`RunAPITests`).
+
+## Time zones: a `Zone` value, never an implicit offset
+
+Until v0.6 the formatters used one fixed offset, read from the machine at start. It was wrong twice a year (a Chilean
+winter booking read in summer came out one hour late), wrong in a Docker container with no `TZ` (UTC), and wrong in
+the browser for a visitor abroad (the visitor's zone, not the clinic's). Prior art that fixed the same mistake:
+JavaScript's Temporal (`ZonedDateTime` requires a `timeZone`), Go's `t.In(loc)`, Java's `ZoneId`, RFC 5545
+`TZID` (unverified links). So the only path is a `Zone` loaded by name; each platform answers one question —
+`zoneOffset(name, instant)` — the server with the embedded IANA database, the browser with `Intl`; all calendar
+arithmetic around it (`zone.go`) is shared and pure.
+

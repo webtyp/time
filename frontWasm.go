@@ -25,25 +25,6 @@ func (tc *timeClient) UnixNano() int64 {
 	return int64(msTimestamp) * 1000000
 }
 
-// local is the JS Date of an instant shifted by the local offset, read with its UTC getters.
-func (tc *timeClient) local(u Unix) js.Value {
-	offsetMs := float64(getOffsetMinutes()) * 60000
-	return tc.dateCtor.New(float64(u)*1000 + offsetMs)
-}
-
-func (tc *timeClient) iso(u Unix) string { return tc.local(u).Call("toISOString").String() }
-
-func (tc *timeClient) FormatDate(u Unix) string { return tc.iso(u)[0:10] }
-func (tc *timeClient) FormatTime(u Unix) string { return tc.iso(u)[11:19] }
-func (tc *timeClient) FormatDateTime(u Unix) string {
-	iso := tc.iso(u)
-	return iso[0:10] + " " + iso[11:19]
-}
-func (tc *timeClient) FormatDateTimeShort(u Unix) string {
-	iso := tc.iso(u)
-	return iso[0:10] + " " + iso[11:16]
-}
-
 // utcISO is the raw UTC ISO string, with no offset applied.
 func (tc *timeClient) utcISO(u Unix) string {
 	return tc.dateCtor.New(float64(u) * 1000).Call("toISOString").String()
@@ -55,7 +36,7 @@ func (tc *timeClient) FormatCompact(u Unix) string {
 	return iso[0:4] + iso[5:7] + iso[8:10] + iso[11:13] + iso[14:16] + iso[17:19]
 }
 
-func (tc *timeClient) ParseDate(dateStr string) (Unix, error) {
+func (tc *timeClient) ParseDateUTC(dateStr string) (Unix, error) {
 	if len(dateStr) != 10 || dateStr[4] != '-' || dateStr[7] != '-' {
 		return 0, Errf("invalid date format: %s (expected YYYY-MM-DD)", dateStr)
 	}
@@ -77,41 +58,31 @@ func (tc *timeClient) ParseTime(timeStr string) (int16, error) {
 	return parseTime(timeStr)
 }
 
-func (tc *timeClient) ParseDateTime(dateStr, timeStr string) (Unix, error) {
-	if len(timeStr) == 5 {
-		timeStr += ":00"
+// zoneOffset resolves the zone through the browser's Intl database at the instant u — never the browser's own
+// offset unless name is "" (MachineZone). An unknown name is an error, never UTC.
+func (tc *timeClient) zoneOffset(name string, u Unix) (int, error) {
+	if name == "" {
+		name = tc.machineZoneName()
 	}
-	jsDate := tc.dateCtor.New(dateStr + "T" + timeStr + "Z")
-	if jsDate.Call("toString").String() == "Invalid Date" {
-		return 0, Errf("invalid date/time format: %s %s", dateStr, timeStr)
+	off, ok := zoneOffsetSec(int64(u), name)
+	if !ok {
+		return 0, ErrUnknownZone
 	}
-	return Unix(int64(jsDate.Call("getTime").Float()) / 1000), nil
+	return int(off), nil
 }
 
-func (tc *timeClient) IsToday(u Unix) bool {
-	return tc.FormatDate(u) == tc.FormatDate(NowUnix())
-}
-
-// LocalMinutesToUnixUTC resolves tz through the browser's Intl database, at the
-// target date — never the browser's own offset, and never today's offset: a
-// Santiago clinic read in June is UTC-4 even when "now" is UTC-3, whatever zone
-// the viewer's browser is in. An invalid zone falls back to UTC, like the
-// backend's time.LoadLocation path.
-func (tc *timeClient) LocalMinutesToUnixUTC(dateUTC Unix, localMinutes int, tz string) Unix {
-	wall := int64(MidnightUTC(dateUTC)) + int64(localMinutes)*60 // the local wall clock, read as if UTC
-	// Two passes, as for any zone conversion: the offset at the first guess can
-	// differ from the offset at the answer when a DST change lies in between.
-	guess := wall - zoneOffsetSec(wall, tz)
-	return Unix(wall - zoneOffsetSec(guess, tz))
+// machineZoneName is the visitor's zone as the browser reports it ("America/Santiago").
+func (tc *timeClient) machineZoneName() string {
+	return js.Global().Get("Intl").Get("DateTimeFormat").New().Call("resolvedOptions").Get("timeZone").String()
 }
 
 // zoneOffsetSec is tz's UTC offset in seconds at the instant utcSec: the zone's
 // wall clock at that instant (from Intl), read as UTC, minus the instant.
-// 0 (UTC) when tz is not a zone the runtime knows.
-func zoneOffsetSec(utcSec int64, tz string) (offset int64) {
+// ok is false when tz is not a zone the runtime knows (Intl throws RangeError).
+func zoneOffsetSec(utcSec int64, tz string) (offset int64, ok bool) {
 	defer func() {
-		if recover() != nil { // Intl throws RangeError on an unknown zone
-			offset = 0
+		if recover() != nil {
+			offset, ok = 0, false
 		}
 	}()
 	opts := js.Global().Get("Object").New()
@@ -144,7 +115,7 @@ func zoneOffsetSec(utcSec int64, tz string) (offset int64) {
 		}
 	}
 	wallMs := js.Global().Get("Date").Call("UTC", y, mo-1, d, h, mi, sec).Float()
-	return int64(wallMs/1000) - utcSec
+	return int64(wallMs/1000) - utcSec, true
 }
 
 type WasmTimer struct {

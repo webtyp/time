@@ -37,22 +37,10 @@ func NowUnix() Unix { return Unix(provider.UnixNano() / nanosPerSecond) }
 // NowNano is the current instant in nanoseconds, for the instant of an event.
 func NowNano() Nano { return Nano(provider.UnixNano()) }
 
-// FormatTime formats an instant as "HH:MM:SS" in the local timezone offset.
-func FormatTime(u Unix) string { return provider.FormatTime(u) }
-
 // FormatMinutes formats minutes since midnight as "HH:MM".
 func FormatMinutes(minutes int) string {
 	return twoDigits(minutes/60) + ":" + twoDigits(minutes%60)
 }
-
-// FormatDate formats an instant as "YYYY-MM-DD" in the local timezone offset.
-func FormatDate(u Unix) string { return provider.FormatDate(u) }
-
-// FormatDateTime formats an instant as "YYYY-MM-DD HH:MM:SS" in the local timezone offset.
-func FormatDateTime(u Unix) string { return provider.FormatDateTime(u) }
-
-// FormatDateTimeShort formats an instant as "YYYY-MM-DD HH:MM" in the local timezone offset.
-func FormatDateTimeShort(u Unix) string { return provider.FormatDateTimeShort(u) }
 
 // FormatISO8601 formats an instant as "YYYY-MM-DDTHH:MM:SSZ" (UTC).
 func FormatISO8601(u Unix) string { return provider.FormatISO8601(u) }
@@ -60,19 +48,12 @@ func FormatISO8601(u Unix) string { return provider.FormatISO8601(u) }
 // FormatCompact formats an instant as "YYYYMMDDHHmmss" (UTC): PDF metadata, file names.
 func FormatCompact(u Unix) string { return provider.FormatCompact(u) }
 
-// ParseDate parses "YYYY-MM-DD" into the instant of its midnight UTC.
-func ParseDate(dateStr string) (Unix, error) { return provider.ParseDate(dateStr) }
+// ParseDateUTC parses "YYYY-MM-DD" into the instant of its midnight UTC: a date as a key, in no place's clock.
+// For a place's midnight use Zone.At(date, 0).
+func ParseDateUTC(dateStr string) (Unix, error) { return provider.ParseDateUTC(dateStr) }
 
 // ParseTime parses "HH:MM" or "HH:MM:SS" into minutes since midnight.
 func ParseTime(timeStr string) (int16, error) { return provider.ParseTime(timeStr) }
-
-// ParseDateTime parses a date ("YYYY-MM-DD") and a time ("HH:MM" or "HH:MM:SS") as UTC.
-func ParseDateTime(dateStr, timeStr string) (Unix, error) {
-	return provider.ParseDateTime(dateStr, timeStr)
-}
-
-// IsToday reports whether the instant falls on today's date in the local timezone offset.
-func IsToday(u Unix) bool { return provider.IsToday(u) }
 
 // IsPast reports whether the instant is before now.
 func IsPast(u Unix) bool { return u < NowUnix() }
@@ -83,10 +64,10 @@ func IsFuture(u Unix) bool { return u > NowUnix() }
 // DaysBetween is the number of full days from a to b (negative when b is before a).
 func DaysBetween(a, b Unix) int { return int((b - a) / Day) }
 
-// Weekday returns the day of the week (0=Sunday … 6=Saturday) of an instant, in UTC. The rule is calendar.Weekday's: this
-// function only turns the instant into its civil date.
-func Weekday(u Unix) int {
-	y, m, d, _, _, _ := CivilDate(u)
+// WeekdayUTC returns the day of the week (0=Sunday … 6=Saturday) of an instant in UTC. A place's weekday is
+// Zone.Weekday.
+func WeekdayUTC(u Unix) int {
+	y, m, d, _, _, _ := CivilUTC(u)
 	return calendar.Weekday(y, m, d)
 }
 
@@ -99,14 +80,16 @@ func MidnightUTC(u Unix) Unix {
 	return days * Day
 }
 
-// Date returns the instant of a UTC date and time. Pure arithmetic, deterministic in WASM and backend.
-func Date(year, month, day, hour, min, sec int) Unix {
+// DateUTC returns the instant of a UTC date and time. Pure arithmetic, deterministic in WASM and backend. A place's
+// date and time is Zone.At.
+func DateUTC(year, month, day, hour, min, sec int) Unix {
 	days := calendar.DaysSinceEpoch(year, month, day)
 	return Unix(days*86400 + int64(hour*3600+min*60+sec))
 }
 
-// CivilDate splits an instant (UTC) into year, month, day, hour, minute and second.
-func CivilDate(u Unix) (year, month, day, hour, min, sec int) {
+// CivilUTC splits an instant into its UTC year, month, day, hour, minute and second. A place's are Zone.Date and
+// Zone.Clock.
+func CivilUTC(u Unix) (year, month, day, hour, min, sec int) {
 	days := int64(u) / 86400
 	rem := int64(u) % 86400
 	if rem < 0 {
@@ -119,12 +102,6 @@ func CivilDate(u Unix) (year, month, day, hour, min, sec int) {
 	min = int(rem / 60)
 	sec = int(rem % 60)
 	return
-}
-
-// LocalMinutesToUnixUTC converts minutes since midnight in the IANA zone tz, on the date that contains dateUTC, into a
-// UTC instant. An unknown zone falls back to UTC.
-func LocalMinutesToUnixUTC(dateUTC Unix, localMinutes int, tz string) Unix {
-	return provider.LocalMinutesToUnixUTC(dateUTC, localMinutes, tz)
 }
 
 // AfterFunc waits for the specified milliseconds then calls f.
@@ -140,17 +117,13 @@ func twoDigits(n int) string {
 // timeProvider is what each platform (standard Go, WASM) supplies.
 type timeProvider interface {
 	UnixNano() int64
-	FormatDate(u Unix) string
-	FormatTime(u Unix) string
-	FormatDateTime(u Unix) string
-	FormatDateTimeShort(u Unix) string
 	FormatISO8601(u Unix) string
 	FormatCompact(u Unix) string
-	ParseDate(dateStr string) (Unix, error)
+	ParseDateUTC(dateStr string) (Unix, error)
 	ParseTime(timeStr string) (int16, error)
-	ParseDateTime(dateStr, timeStr string) (Unix, error)
-	IsToday(u Unix) bool
-	LocalMinutesToUnixUTC(dateUTC Unix, localMinutes int, tz string) Unix
+	// zoneOffset is the zone's offset from UTC at u, in seconds; name "" = this computer's zone.
+	zoneOffset(name string, u Unix) (int, error)
+	machineZoneName() string
 	AfterFunc(milliseconds int, f func()) Timer
 }
 

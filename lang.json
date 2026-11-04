@@ -1,0 +1,8 @@
+{
+  "languages": ["es", "zh", "hi", "ar", "pt", "fr", "de", "ru"],
+  "keys": {
+    "and": ["y", "", "", "", "", "", "", ""],
+    "minutes must be between": ["los minutos deben estar entre", "", "", "", "", "", "", ""],
+    "unknown time zone — use an IANA name such as": ["zona horaria desconocida — usa un nombre IANA como", "", "", "", "", "", "", ""]
+  }
+}
