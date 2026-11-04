@@ -6,53 +6,53 @@ import (
 	"webtyp.com/time"
 )
 
-func TestZeroDayBoundsIsClosed(t *testing.T) {
-	var b time.DayBounds
-	if b.Open {
-		t.Error("zero DayBounds should be closed (safe default)")
+func TestZeroDayLimitsIsClosed(t *testing.T) {
+	var l time.DayLimits
+	if l.Open {
+		t.Error("zero DayLimits should be closed (safe default)")
 	}
-	if ok := b.Contains(0); ok {
+	if ok := l.Contains(0); ok {
 		t.Error("a closed day should not contain any minute")
 	}
-	if _, _, ok := b.Clamp(0, 1440); ok {
+	if _, _, ok := l.Clamp(0, 1440); ok {
 		t.Error("Clamp on a closed day should report nothing survives")
 	}
 }
 
-func TestUnboundedCoversTheWholeDay(t *testing.T) {
-	b := time.Unbounded()
-	if !b.Open {
-		t.Fatal("Unbounded should be open")
+func TestUnlimitedCoversTheWholeDay(t *testing.T) {
+	l := time.Unlimited()
+	if !l.Open {
+		t.Fatal("Unlimited should be open")
 	}
-	if b.OpenMin != 0 || b.CloseMin != 1440 {
-		t.Fatalf("Unbounded = [%d, %d), want [0, 1440)", b.OpenMin, b.CloseMin)
+	if l.OpenMin != 0 || l.CloseMin != 1440 {
+		t.Fatalf("Unlimited = [%d, %d), want [0, 1440)", l.OpenMin, l.CloseMin)
 	}
 	for _, m := range []int{0, 1, 479, 1439} {
-		if !b.Contains(m) {
-			t.Errorf("Unbounded should contain minute %d", m)
+		if !l.Contains(m) {
+			t.Errorf("Unlimited should contain minute %d", m)
 		}
 	}
-	if b.Contains(1440) {
+	if l.Contains(1440) {
 		t.Error("half-open window: 1440 is out")
 	}
 }
 
 func TestContainsIsHalfOpen(t *testing.T) {
-	b := time.DayBounds{Open: true, OpenMin: 480, CloseMin: 1200}
-	if !b.Contains(480) {
+	l := time.DayLimits{Open: true, OpenMin: 480, CloseMin: 1200}
+	if !l.Contains(480) {
 		t.Error("OpenMin should be inside (half-open)")
 	}
-	if b.Contains(1200) {
+	if l.Contains(1200) {
 		t.Error("CloseMin should be outside (half-open)")
 	}
-	if b.Contains(479) || b.Contains(1201) {
+	if l.Contains(479) || l.Contains(1201) {
 		t.Error("minutes outside the window should be out")
 	}
 }
 
 func TestClampTrimsBothEdges(t *testing.T) {
-	b := time.DayBounds{Open: true, OpenMin: 480, CloseMin: 1200}
-	s, e, ok := b.Clamp(400, 1300)
+	l := time.DayLimits{Open: true, OpenMin: 480, CloseMin: 1200}
+	s, e, ok := l.Clamp(400, 1300)
 	if !ok {
 		t.Fatal("overlapping window should survive")
 	}
@@ -62,28 +62,28 @@ func TestClampTrimsBothEdges(t *testing.T) {
 }
 
 func TestClampOnClosedDayReportsNothingSurvives(t *testing.T) {
-	var b time.DayBounds
-	if _, _, ok := b.Clamp(0, 1440); ok {
+	var l time.DayLimits
+	if _, _, ok := l.Clamp(0, 1440); ok {
 		t.Error("Clamp on a closed day must report nothing survives")
 	}
 }
 
 func TestClampReportsFalseWhenTheWindowsDoNotOverlap(t *testing.T) {
-	b := time.DayBounds{Open: true, OpenMin: 480, CloseMin: 1200}
-	if _, _, ok := b.Clamp(0, 400); ok {
+	l := time.DayLimits{Open: true, OpenMin: 480, CloseMin: 1200}
+	if _, _, ok := l.Clamp(0, 400); ok {
 		t.Error("block entirely before opening must report false")
 	}
-	if _, _, ok := b.Clamp(1300, 1440); ok {
+	if _, _, ok := l.Clamp(1300, 1440); ok {
 		t.Error("block entirely after closing must report false")
 	}
-	if _, _, ok := b.Clamp(1200, 1300); ok {
+	if _, _, ok := l.Clamp(1200, 1300); ok {
 		t.Error("block starting exactly at close must report false (half-open)")
 	}
 }
 
 func TestClampLeavesAnAlreadyInsideRangeUntouched(t *testing.T) {
-	b := time.DayBounds{Open: true, OpenMin: 480, CloseMin: 1200}
-	s, e, ok := b.Clamp(600, 900)
+	l := time.DayLimits{Open: true, OpenMin: 480, CloseMin: 1200}
+	s, e, ok := l.Clamp(600, 900)
 	if !ok {
 		t.Fatal("inside range should survive")
 	}

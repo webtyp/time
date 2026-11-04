@@ -1,4 +1,4 @@
-# TinyTime
+# time
 <img src="docs/img/badges.svg">
 
 A minimal, portable time utility for Go and TinyGo with WebAssembly support. Automatically handles timezones and uses JavaScript Date APIs in WASM environments to keep binaries small.
@@ -97,7 +97,7 @@ timer.Stop()
 
 ## WebAssembly Usage
 
-When compiled for WebAssembly (`GOOS=js GOARCH=wasm`), tinytime automatically uses JavaScript's native Date APIs instead of bundling Go's `time` package.
+When compiled for WebAssembly (`GOOS=js GOARCH=wasm`), `webtyp.com/time` automatically uses JavaScript's native Date APIs instead of bundling Go's stdlib `time` package.
 
 ```bash
 # Build for WebAssembly
