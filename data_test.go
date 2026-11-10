@@ -168,7 +168,7 @@ func ZoneShared(t *testing.T) {
 	}
 
 	from, to, err := scl.Day("2019-07-15")
-	if err != nil || from != 1563163200 || to != 1563249600 || !(from <= night && night < to) {
+	if err != nil || from != 1563163200 || to != 1563249600 || (from > night || night >= to) {
 		t.Errorf("Day(2019-07-15) = [%d, %d) %v; want [1563163200, 1563249600) containing the night booking", from, to, err)
 	}
 	if _, err := scl.At("2019-07-15", 24*60); err == nil {

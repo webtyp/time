@@ -13,9 +13,12 @@ Every instant has its unit in its **type**, so mixing them does not compile:
 |---|---|---|---|
 | `time.Unix` | seconds since 1970-01-01 UTC | **dates and deadlines**: an expiry, the day of a booking, the end of a session, a JWT `exp` | `time.NowUnix()` |
 | `time.Nano` | nanoseconds since 1970-01-01 UTC | **the instant an event happened**: `created_at`, `updated_at`; orders two events of the same second | `time.NowNano()` |
+| `time.Duration` | nanoseconds, no origin | **how long**: a wait, a retry delay, a timeout. Never an instant | none: `250*time.Millisecond`, `2*time.Second` |
 
-- Durations are typed seconds: `time.Minute`, `time.Hour`, `time.Day` (`time.Unix`). `time.NowUnix() + 30*time.Day`
+- Date offsets are typed seconds: `time.Minute`, `time.Hour`, `time.Day` (`time.Unix`). `time.NowUnix() + 30*time.Day`
   compiles; `time.NowNano() + 30*time.Day` does not.
+- A wait is a `time.Duration` (`time.Millisecond`, `time.Second`; a minute is `60*time.Second`): `now.Add(30*time.Second)` is the
+  instant it ends and `d.Milliseconds()` is what a browser timer takes.
 - An event compared with a date or formatted: `n.Unix()`; a date compared with an event: `u.Nano()`. Never divide or
   multiply by 1e9.
 - A model field that holds an instant is declared `model.UnixTime()` or `model.NanoTime()`; `ormc` generates it as
@@ -61,6 +64,8 @@ zone's **at that instant** (summer and winter time included), never "the offset 
 |---|---|
 | `NowUnix() Unix`, `NowNano() Nano` | the two clocks |
 | `(Nano) Unix() Unix`, `(Unix) Nano() Nano` | explicit conversion between the two units |
+| `Duration`, `Nanosecond`, `Microsecond`, `Millisecond`, `Second` | a length of time in nanoseconds, typed |
+| `(Duration) Milliseconds() int64`, `(Nano) Add(Duration) Nano` | whole milliseconds of a wait; the instant a wait after an instant ends |
 | `LoadZone(name) (Zone, error)`, `MachineZone() Zone` | a place's clock / this computer's clock (tools only) |
 | `(Zone) At(date, minutes) (Unix, error)` | a local date ("YYYY-MM-DD") and minutes since its midnight → the instant |
 | `(Zone) Day(date) (from, to Unix, error)` | the instants of a local day, `[from, to)` |

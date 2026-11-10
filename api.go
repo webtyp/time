@@ -17,7 +17,30 @@ const (
 	Day    Unix = 86400
 )
 
-const nanosPerSecond = 1000000000
+// Duration is a length of time in nanoseconds: how long to wait, never an instant. A wait is a Duration and an instant
+// is a Nano or a Unix, so passing one for the other does not compile. A Duration is written with its unit:
+// 250*time.Millisecond, 2*time.Second; a minute is 60*time.Second (Minute, Hour and Day are Unix seconds, see above).
+type Duration int64
+
+// Durations in nanoseconds, typed: backoff.New(time.Second, 60*time.Second) says what it means.
+const (
+	Nanosecond  Duration = 1
+	Microsecond          = 1000 * Nanosecond
+	Millisecond          = 1000 * Microsecond
+	Second               = 1000 * Millisecond
+)
+
+const nanosPerSecond = int64(Second)
+
+// Milliseconds is the whole milliseconds of d, the unit of AfterFunc and of a browser timer; a fraction is dropped.
+//
+// Example: AfterFunc(int((1500*Millisecond).Milliseconds()), f) // 1500
+func (d Duration) Milliseconds() int64 { return int64(d / Millisecond) }
+
+// Add is the instant d after n: when the next attempt is due, when a wait ends.
+//
+// Example: due := NowNano().Add(30 * Second)
+func (n Nano) Add(d Duration) Nano { return n + Nano(d) }
 
 // Unix truncates an event instant to the second, for comparing it with a date or formatting it.
 func (n Nano) Unix() Unix { return Unix(int64(n) / nanosPerSecond) }

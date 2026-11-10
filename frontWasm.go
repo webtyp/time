@@ -22,7 +22,7 @@ type timeClient struct {
 func (tc *timeClient) UnixNano() int64 {
 	jsDate := tc.dateCtor.New()
 	msTimestamp := jsDate.Call("getTime").Float()
-	return int64(msTimestamp) * 1000000
+	return int64(msTimestamp) * int64(Millisecond)
 }
 
 // utcISO is the raw UTC ISO string, with no offset applied.
